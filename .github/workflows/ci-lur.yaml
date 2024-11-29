@@ -1,0 +1,50 @@
+################################################################################
+#      Copyright (C) 2020        Sebastian Francisco Colomar Bauza             #
+#      SPDX-License-Identifier:  GPL-2.0-only                                  #
+################################################################################
+name: CI                                                                       #
+on:                                                                            #
+  push:                                                                        #
+    branches:                                                                  #
+    - main                                                                     #
+jobs:                                                                          #
+  host:                                                                          #
+    runs-on: ubuntu-latest                                                      #
+    steps:                                                                     #
+    - name: checkout                                                           #
+      uses: actions/checkout@v2                                                #
+    - name: os-release
+      run: cat /etc/os-release
+    - name: run                                                                #
+      run: php -f main/src/index.php -S 0.0.0.0:8080                                &
+    - name: which
+      run: which wget && which curl
+    - name: cat
+      run: cat main/src/index.php
+    - name: test                                                               #
+      run:                                                                     |
+        while true                                                             ;
+          do                                                                   \
+            sleep 10                                                           ;
+            wget -q -O - localhost:8080/main/src/index.php | grep "PHP.*phpinfo()" && break ;
+          done                                                                 ;
+  docker:                                                                          #
+    runs-on: ubuntu-latest                                                      #
+    steps:                                                                     #
+    - name: checkout                                                           #
+      uses: actions/checkout@v2                                                #
+    - name: docker-build                                                                #
+      run:                                                                     |
+        mkdir --parents build-context/
+        docker build --file main/Dockerfile --tag localhost/library/my_image:test build-context/
+    - name: docker-run
+      run: docker run --cpus 0.01 --detach --memory 10M --memory-reservation 10M --name phpinfo --publish 80:8080 --read-only --restart always --user nobody:nogroup --volume ${PWD}/main/src/index.php:/src/index.php:ro --workdir /src/ localhost/library/my_image:test php -f index.php -S 0.0.0.0:8080
+    - name: test                                                               #
+      run:                                                                     |
+        while true                                                             ;
+          do                                                                   \
+            sleep 10                                                           ;
+            docker logs phpinfo 2>& 1 | grep "PHP.*started" && break ;
+          done                                                                 ;
+
+################################################################################
